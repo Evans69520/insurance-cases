@@ -505,7 +505,45 @@
             margin-top: 10px;
             line-height: 1.55;
         }
+    
+        .img-preview-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .img-thumb-card {
+            position: relative;
+            width: 68px;
+            height: 68px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+        }
+        .img-thumb-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .img-thumb-del {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 20px;
+            height: 20px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.78);
+            color: #fff;
+            font-size: 12px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+        }
+        .ocr-status {
+            margin-top: 10px;
+            padding: 9px 12px;
+            border-radius: 8px;
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            color: #92400e;
+            font-size: 0.88em;
+            font-weight: 600;
+        }
     </style>
+
 
 </head>
 <body>
@@ -586,8 +624,8 @@
         <div class="advisor-tools">
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
                 <label class="select-page-btn" style="cursor:pointer;">
-                    📂 上傳案情文字檔 (.txt)
-                    <input type="file" id="advisorFileInput" accept=".txt,.md,.csv" style="display:none;">
+                    📎 上傳文字檔或圖片（診斷書 / 拒賠函 / 截圖）
+                    <input type="file" id="advisorFileInput" accept=".txt,.md,.csv,image/*" multiple style="display:none;">
                 </label>
                 <label style="font-size:0.88em;color:#334155;font-weight:600;display:inline-flex;align-items:center;gap:5px;cursor:pointer;">
                     <input type="checkbox" id="preferWinCheck" checked style="accent-color:var(--accent-blue);">
@@ -597,6 +635,8 @@
             <button class="action-btn copy-btn" id="runMatchBtn" style="padding:9px 18px;font-size:0.93em;">🔍 立即比對相關判例</button>
         </div>
 
+        <div id="advisorImagePreviews" class="img-preview-strip"></div>
+        <div id="ocrStatusBanner" class="ocr-status" style="display:none;"></div>
         <div id="advisorResultsArea" style="margin-top:18px;"></div>
     </div>
 </div>
@@ -605,6 +645,7 @@
     <div class="modal-content" id="modalBody"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="cases.js"></script>
 <script>
     const rawData = Array.isArray(window.caseData) ? window.caseData : [];
