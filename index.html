@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>保險判決圖卡牆（10年資料庫）</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 28px 18px 64px;
+        }
+        .wrapper { max-width: 1220px; margin: 0 auto; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 22px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        .header h1 { margin: 0 0 6px 0; font-size: 1.8em; }
+        .header p { margin: 0; color: #9e9e9e; font-size: 0.94em; }
+        .total-counter { text-align: right; }
+        .total-number { font-size: 2em; font-weight: bold; color: #f5c542; line-height: 1; }
+        .total-label { font-size: 0.85em; color: #9e9e9e; margin-top: 4px; }
+
+        .search-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+        .search-bar {
+            flex: 1;
+            min-width: 240px;
+            padding: 12px 18px;
+            border-radius: 26px;
+            border: 1px solid #3d3d3d;
+            background-color: #1c1c1c;
+            color: #fff;
+            font-size: 1em;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .search-bar:focus { border-color: #64b5f6; }
+        .reset-btn {
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            padding: 10px 18px;
+            border-radius: 26px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .reset-btn:hover { background-color: #3d3d3d; color: #fff; }
+
+        .controls-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+        .select-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background-color: #181818;
+            border: 1px solid #2f2f2f;
+            border-radius: 10px;
+            padding: 6px 10px;
+            font-size: 0.88em;
+            color: #aaa;
+        }
+        .select-group select {
+            background-color: #252525;
+            color: #fff;
+            border: 1px solid #3c3c3c;
+            border-radius: 6px;
+            padding: 5px 8px;
+            font-size: 0.95em;
+            outline: none;
+            cursor: pointer;
+            max-width: 240px;
+        }
+        .select-group select:focus { border-color: #64b5f6; }
+
+        .filter-panel {
+            background-color: #181818;
+            border: 1px solid #2b2b2b;
+            border-radius: 12px;
+            padding: 15px 18px;
+            margin-bottom: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .filter-row { display: flex; align-items: flex-start; gap: 12px; }
+        .filter-label { min-width: 68px; color: #888; font-size: 0.88em; padding-top: 7px; font-weight: bold; }
+        .filter-chips { display: flex; flex-wrap: wrap; gap: 7px; flex: 1; }
+        .chip {
+            background-color: #252525;
+            color: #cccccc;
+            border: 1px solid #383838;
+            padding: 5px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.16s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .chip:hover { background-color: #333; color: #fff; }
+        .chip .count { font-size: 0.84em; opacity: 0.72; }
+        .chip.active-result { background-color: #29b6f6; color: #000; border-color: #29b6f6; font-weight: bold; }
+        .chip.active-topic { background-color: #f5c542; color: #000; border-color: #f5c542; font-weight: bold; }
+        .chip.active-company { background-color: #ffffff; color: #000; border-color: #ffffff; font-weight: bold; }
+        .chip.toggle-more {
+            background-color: transparent;
+            border: 1px dashed #555;
+            color: #90caf9;
+        }
+        .chip.toggle-more:hover { border-color: #90caf9; background-color: #1e2a36; }
+
+        .stats-panel {
+            background-color: #1b1b1b;
+            border: 1px solid #2f2f2f;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 16px;
+        }
+        .stats-numbers { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.93em; margin-bottom: 10px; align-items: center; }
+        .stat-win { color: #66bb6a; font-weight: bold; }
+        .stat-partial { color: #ffa726; font-weight: bold; }
+        .stat-lose { color: #ef5350; font-weight: bold; }
+        .ratio-bar { height: 8px; background-color: #2d2d2d; border-radius: 6px; overflow: hidden; display: flex; }
+        .bar-win { background-color: #2e7d32; transition: width 0.3s; }
+        .bar-partial { background-color: #ef6c00; transition: width 0.3s; }
+        .bar-lose { background-color: #c62828; transition: width 0.3s; }
+
+        .list-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+            font-size: 0.88em;
+            color: #aaa;
+        }
+
+        .card-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 18px; }
+        .card {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 18px;
+            transition: transform 0.18s, border-color 0.18s;
+            display: flex;
+            flex-direction: column;
+            gap: 11px;
+            cursor: pointer;
+        }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,0.55); border-color: #f5c542; }
+
+        .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+        .tag { padding: 4px 9px; border-radius: 5px; font-size: 0.79em; font-weight: bold; }
+        .tag.win-customer { background-color: #2e7d32; color: #fff; }
+        .tag.win-partial { background-color: #ef6c00; color: #fff; }
+        .tag.win-company { background-color: #c62828; color: #fff; }
+        .tag.topic { background-color: #37474f; color: #eceff1; }
+        .tag.year-badge { background-color: #2a2a2a; color: #bdbdbd; border: 1px solid #444; font-weight: normal; }
+
+        .company-title { font-size: 1.15em; font-weight: bold; color: #f5c542; line-height: 1.35; }
+        .claim-pill {
+            display: inline-block;
+            background-color: #262626;
+            border: 1px solid #3a3a3a;
+            color: #90caf9;
+            font-size: 0.83em;
+            padding: 5px 10px;
+            border-radius: 6px;
+            align-self: flex-start;
+        }
+        .summary {
+            font-size: 0.92em;
+            line-height: 1.65;
+            color: #cccccc;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .card-footer {
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 1px dashed #3f3f3f;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8em;
+            color: #888;
+            gap: 8px;
+        }
+        .read-more { color: #64b5f6; font-weight: bold; white-space: nowrap; }
+        .no-results { text-align: center; color: #999; font-size: 1.02em; grid-column: 1 / -1; padding: 48px 20px; line-height: 1.8; }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 26px;
+        }
+        .page-btn {
+            background-color: #1e1e1e;
+            color: #ddd;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            padding: 7px 12px;
+            cursor: pointer;
+            font-size: 0.88em;
+            min-width: 36px;
+            transition: all 0.15s;
+        }
+        .page-btn:hover:not(:disabled) { background-color: #333; color: #fff; border-color: #666; }
+        .page-btn.active { background-color: #f5c542; color: #000; border-color: #f5c542; font-weight: bold; }
+        .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .page-ellipsis { color: #777; padding: 0 4px; }
+        .page-jump {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: 10px;
+            font-size: 0.86em;
+            color: #999;
+        }
+        .page-jump input {
+            width: 54px;
+            padding: 5px 8px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background: #1c1c1c;
+            color: #fff;
+            text-align: center;
+            outline: none;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.82);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+        .modal-content {
+            background: #fdfbf7;
+            color: #222;
+            width: 100%;
+            max-width: 820px;
+            max-height: 88vh;
+            overflow-y: auto;
+            border-radius: 14px;
+            padding: 0 26px 26px;
+            box-sizing: border-box;
+        }
+        .modal-actions {
+            position: sticky;
+            top: 0;
+            display: flex;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 16px 0 12px;
+            margin-bottom: 12px;
+            background: rgba(253, 251, 247, 0.96);
+            border-bottom: 1px solid #ece4d5;
+            backdrop-filter: blur(4px);
+            z-index: 5;
+        }
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border: none;
+            border-radius: 20px;
+            padding: 7px 14px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: bold;
+            text-decoration: none;
+            transition: opacity 0.15s;
+        }
+        .action-btn:hover { opacity: 0.88; }
+        .raw-btn { background: #2e7d32; color: #fff; }
+        .official-btn { background: #e8eef6; color: #1f3a5f; border: 1px solid #bfd0e6; }
+        .copy-btn { background: #1f3a5f; color: #fff; }
+        .close-btn { background: #222; color: #fff; }
+
+        .modal-meta { color: #555; font-size: 0.9em; margin-top: 6px; line-height: 1.6; }
+        .amount-badge {
+            display: inline-block;
+            background: #fff;
+            border: 1px solid #e0c89f;
+            color: #794c00;
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.92em;
+        }
+        .summary-box {
+            background: #fff4e0;
+            border: 1px solid #f0d7a7;
+            border-radius: 10px;
+            padding: 16px;
+            line-height: 1.7;
+            margin-top: 14px;
+        }
+        .modal-section { margin-top: 22px; }
+        .modal-section h3 {
+            font-size: 1.05em;
+            color: #1f3a5f;
+            border-left: 4px solid #1f3a5f;
+            padding-left: 10px;
+            margin-bottom: 12px;
+        }
+        .timeline-item { border-left: 2px solid #c62828; padding-left: 14px; margin-bottom: 12px; }
+        .timeline-date { font-weight: bold; color: #b71c1c; font-size: 0.9em; }
+        .args-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .arg-box { background: #fff; border: 1px solid #ddd; border-radius: 10px; overflow: hidden; }
+        .arg-header { padding: 10px 14px; color: #fff; font-weight: bold; }
+        .arg-header.customer { background: #2e7d32; }
+        .arg-header.company { background: #1f3a5f; }
+        .arg-box ul { margin: 0; padding: 14px 18px 14px 28px; line-height: 1.65; }
+        .judgment-list { padding-left: 20px; line-height: 1.7; }
+        .judgment-list li { margin-bottom: 8px; }
+        .disclaimer {
+            margin-top: 24px;
+            padding-top: 12px;
+            border-top: 1px solid #e5dfd3;
+            font-size: 0.8em;
+            color: #777;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 640px) {
+            .filter-row { flex-direction: column; gap: 6px; }
+            .filter-label { padding-top: 0; }
+            .args-grid { grid-template-columns: 1fr; }
+            .select-group { width: 100%; justify-content: space-between; box-sizing: border-box; }
+            .select-group select { max-width: 68%; }
+            .modal-content { padding: 0 16px 20px; }
+            .modal-actions { justify-content: flex-start; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div class="header">
+        <div>
+            <h1>保險判決圖卡牆</h1>
+            <p>收錄民國 106–115 年全台法院「給付保險金」民事判決，支援多詞全文秒搜與原文即時查閱</p>
+        </div>
+        <div class="total-counter">
+            <div class="total-number" id="totalCount">0</div>
+            <div class="total-label">則收錄判決</div>
+        </div>
+    </div>
+
+    <div class="search-row">
+        <input type="text" id="searchInput" class="search-bar" placeholder="全文搜尋（空白可隔開多詞）：例如 宏泰 住院、百斯瑞明、癌症 標靶、桃園地院...">
+        <button class="reset-btn" id="resetBtn">↺ 重設全部條件</button>
+    </div>
+
+    <div class="controls-bar">
+        <label class="select-group">
+            <span>裁判年度</span>
+            <select id="yearSelect"></select>
+        </label>
+        <label class="select-group">
+            <span>保險公司</span>
+            <select id="companySelect"></select>
+        </label>
+        <label class="select-group">
+            <span>排序方式</span>
+            <select id="sortSelect">
+                <option value="newest">判決日：最新 → 最舊</option>
+                <option value="oldest">判決日：最舊 → 最新</option>
+            </select>
+        </label>
+        <label class="select-group">
+            <span>每頁顯示</span>
+            <select id="pageSizeSelect">
+                <option value="24" selected>24 筆</option>
+                <option value="48">48 筆</option>
+            </select>
+        </label>
+    </div>
+
+    <div class="filter-panel" id="filterPanel"></div>
+    <div class="stats-panel" id="statsPanel"></div>
+    <div class="list-toolbar" id="listToolbar"></div>
+    <div class="card-container" id="card-container"></div>
+    <div class="pagination" id="pagination"></div>
+</div>
+
+<div class="modal-overlay" id="detailModal">
+    <div class="modal-content" id="modalBody"></div>
+</div>
+
+<script src="cases.js"></script>
+<script>
+    const rawData = Array.isArray(window.caseData) ? window.caseData : [];
+    const RESULTS_LIST = ["保戶勝訴", "部分勝訴", "保險公司勝"];
+    const TOP_TOPIC_LIMIT = 14;
+    const TOP_COMPANY_LIMIT = 12;
+
+    const state = {
+        search: "",
+        result: "all",
+        topic: "all",
+        company: "all",
+        year: "all",
+        sort: "newest",
+        page: 1,
+        pageSize: 24,
+        showAllTopics: false
+    };
+
+    const filterPanel = document.getElementById('filterPanel');
+    const statsPanel = document.getElementById('statsPanel');
+    const listToolbar = document.getElementById('listToolbar');
+    const container = document.getElementById('card-container');
+    const paginationEl = document.getElementById('pagination');
+    const searchInput = document.getElementById('searchInput');
+    const resetBtn = document.getElementById('resetBtn');
+    const yearSelect = document.getElementById('yearSelect');
+    const companySelect = document.getElementById('companySelect');
+    const sortSelect = document.getElementById('sortSelect');
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    const totalCount = document.getElementById('totalCount');
+    const detailModal = document.getElementById('detailModal');
+    const modalBody = document.getElementById('modalBody');
+
+    function escapeHtml(str) {
+        return String(str ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function getResultClass(item) {
+        const rc = item.tags?.resultClass;
+        if (rc === 'win-customer' || rc === 'win-partial' || rc === 'win-company') return rc;
+        const r = item.tags?.result || '';
+        if (r.includes('部分')) return 'win-partial';
+        if (r.includes('保戶')) return 'win-customer';
+        if (r.includes('公司')) return 'win-company';
+        return 'win-partial';
+    }
+
+    function parseDateMeta(item) {
+        const dateStr = String(item.basicInfo?.date || '');
+        let m = dateStr.match(/(?:民國\s*)?(\d{2,4})\s*[\/\-\.年]\s*(\d{1,2})\s*[\/\-\.月]\s*(\d{1,2})/);
+        if (m) {
+            let y = parseInt(m[1], 10);
+            const mo = parseInt(m[2], 10);
+            const d = parseInt(m[3], 10);
+            if (y > 1911) y -= 1911;
+            if (y >= 80 && y <= 150) {
+                return { year: y, sortKey: y * 10000 + mo * 100 + d };
+            }
+        }
+        const fallbackSrc = `${dateStr} ${item.basicInfo?.caseNumber || ''} ${item.sourceFile || ''}`;
+        m = fallbackSrc.match(/(\d{2,3})\s*(?:年度|年)/);
+        if (m) {
+            const y = parseInt(m[1], 10);
+            if (y >= 80 && y <= 150) {
+                return { year: y, sortKey: y * 10000 };
+            }
+        }
+        return { year: null, sortKey: 0 };
+    }
+
+    const caseMap = new Map();
+    const resultCounts = new Map();
+    const topicCounts = new Map();
+    const companyCounts = new Map();
+    const yearCounts = new Map();
+
+    const caseData = rawData.map((item, idx) => {
+        const safeId = item.id || `case_idx_${idx}`;
+        const dateMeta = parseDateMeta(item);
+        const resultLabel = item.tags?.result || '未分類';
+        const resultClass = getResultClass(item);
+        const topics = Array.isArray(item.tags?.topics) ? item.tags.topics.filter(Boolean) : [];
+        const company = (item.basicInfo?.insuranceCompany || '').trim();
+
+        resultCounts.set(resultLabel, (resultCounts.get(resultLabel) || 0) + 1);
+        topics.forEach(t => topicCounts.set(t, (topicCounts.get(t) || 0) + 1));
+        if (company) companyCounts.set(company, (companyCounts.get(company) || 0) + 1);
+        if (dateMeta.year) yearCounts.set(dateMeta.year, (yearCounts.get(dateMeta.year) || 0) + 1);
+
+        const timelineText = (item.content?.timeline || []).map(t => `${t.date || ''} ${t.event || ''}`).join(' ');
+        const custArgs = (item.content?.arguments?.customer || []).join(' ');
+        const compArgs = (item.content?.arguments?.company || []).join(' ');
+        const judgText = (item.content?.judgment || []).join(' ');
+
+        const searchText = [
+            item.basicInfo?.court,
+            company,
+            item.basicInfo?.insuranceType,
+            item.basicInfo?.caseNumber,
+            item.basicInfo?.date,
+            item.basicInfo?.claimInfo,
+            resultLabel,
+            ...topics,
+            ...(item.tags?.keywords || []),
+            item.content?.summary,
+            timelineText,
+            custArgs,
+            compArgs,
+            judgText
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        const enriched = {
+            ...item,
+            id: safeId,
+            _result: resultLabel,
+            _resultClass: resultClass,
+            _topics: topics,
+            _company: company,
+            _year: dateMeta.year,
+            _sortKey: dateMeta.sortKey,
+            _searchText: searchText
+        };
+        caseMap.set(safeId, enriched);
+        return enriched;
+    });
+
+    const sortedTopics = [...topicCounts.entries()].sort((a, b) => b[1] - a[1]);
+    const sortedCompanies = [...companyCounts.entries()].sort((a, b) => b[1] - a[1]);
+    const sortedYears = [...yearCounts.entries()].sort((a, b) => b[0] - a[0]);
+
+    totalCount.textContent = caseData.length.toLocaleString();
+
+    function initDropdowns() {
+        yearSelect.innerHTML = `<option value="all">全部年度 (${caseData.length} 筆)</option>` +
+            sortedYears.map(([y, cnt]) => `<option value="${y}">民國 ${y} 年 (${cnt} 筆)</option>`).join('');
+
+        companySelect.innerHTML = `<option value="all">全部保險公司 (共 ${sortedCompanies.length} 家)</option>` +
+            sortedCompanies.map(([name, cnt]) => `<option value="${escapeHtml(name)}">${escapeHtml(name)} (${cnt})</option>`).join('');
+    }
+
+    function renderFilters() {
+        const buildChips = (type, entries, activeClass, totalAll, extraBtn = "") => {
+            const allActive = state[type] === "all" ? activeClass : "";
+            let html = `<button class="chip ${allActive}" data-type="${type}" data-value="all">全部 <span class="count">${totalAll}</span></button>`;
+            entries.forEach(([val, cnt]) => {
+                const isActive = state[type] === val ? activeClass : "";
+                html += `<button class="chip ${isActive}" data-type="${type}" data-value="${escapeHtml(val)}">${escapeHtml(val)} <span class="count">${cnt}</span></button>`;
+            });
+            return html + extraBtn;
+        };
+
+        const resultEntries = RESULTS_LIST.map(r => [r, resultCounts.get(r) || 0]);
+
+        const visibleTopics = state.showAllTopics ? sortedTopics : sortedTopics.slice(0, TOP_TOPIC_LIMIT);
+        if (!state.showAllTopics && state.topic !== "all" && !visibleTopics.some(([t]) => t === state.topic)) {
+            visibleTopics.push([state.topic, topicCounts.get(state.topic) || 0]);
+        }
+        const topicToggleBtn = sortedTopics.length > TOP_TOPIC_LIMIT
+            ? `<button class="chip toggle-more" data-action="toggle-topics">${state.showAllTopics ? "▲ 收合主題" : `＋ 展開全部 ${sortedTopics.length} 個主題`}</button>`
+            : "";
+
+        const visibleCompanies = sortedCompanies.slice(0, TOP_COMPANY_LIMIT);
+        if (state.company !== "all" && !visibleCompanies.some(([c]) => c === state.company)) {
+            visibleCompanies.push([state.company, companyCounts.get(state.company) || 0]);
+        }
+        const compHint = sortedCompanies.length > TOP_COMPANY_LIMIT
+            ? `<span style="font-size:0.8em;color:#777;padding:6px 4px;">（其餘請用上方「保險公司」下拉選單）</span>`
+            : "";
+
+        filterPanel.innerHTML = `
+            <div class="filter-row">
+                <div class="filter-label">勝負結果</div>
+                <div class="filter-chips">${buildChips("result", resultEntries, "active-result", caseData.length)}</div>
+            </div>
+            <div class="filter-row">
+                <div class="filter-label">爭議主題</div>
+                <div class="filter-chips">${buildChips("topic", visibleTopics, "active-topic", caseData.length, topicToggleBtn)}</div>
+            </div>
+            <div class="filter-row">
+                <div class="filter-label">熱門公司</div>
+                <div class="filter-chips">${buildChips("company", visibleCompanies, "active-company", caseData.length, compHint)}</div>
+            </div>
+        `;
+    }
+
+    function renderPagination(totalItems, totalPages) {
+        if (totalPages <= 1) {
+            paginationEl.innerHTML = "";
+            return;
+        }
+        const cur = state.page;
+        const pages = new Set([1, totalPages, cur - 2, cur - 1, cur, cur + 1, cur + 2]);
+        const validPages = [...pages].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+
+        let html = `<button class="page-btn" data-page="${cur - 1}" ${cur <= 1 ? 'disabled' : ''}>← 上一頁</button>`;
+        let prev = 0;
+        validPages.forEach(p => {
+            if (prev && p - prev > 1) html += `<span class="page-ellipsis">…</span>`;
+            html += `<button class="page-btn ${p === cur ? 'active' : ''}" data-page="${p}">${p}</button>`;
+            prev = p;
+        });
+        html += `<button class="page-btn" data-page="${cur + 1}" ${cur >= totalPages ? 'disabled' : ''}>下一頁 →</button>`;
+        html += `
+            <span class="page-jump">
+                跳至第
+                <input type="number" id="jumpPageInput" min="1" max="${totalPages}" value="${cur}">
+                / ${totalPages} 頁
+                <button class="page-btn" id="jumpPageBtn">前往</button>
+            </span>
+        `;
+        paginationEl.innerHTML = html;
+    }
+
+    function renderAll() {
+        renderFilters();
+        yearSelect.value = state.year;
+        companySelect.value = state.company;
+        sortSelect.value = state.sort;
+        pageSizeSelect.value = String(state.pageSize);
+
+        if (caseData.length === 0) {
+            statsPanel.style.display = 'none';
+            listToolbar.innerHTML = '';
+            paginationEl.innerHTML = '';
+            container.innerHTML = '<div class="no-results">目前資料庫還沒有判決資料。<br>請確認 <strong>cases.js</strong> 與 <strong>index.html</strong> 位於同一個資料夾內。</div>';
+            return;
+        }
+        statsPanel.style.display = 'block';
+
+        const keywords = state.search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const targetYear = state.year === "all" ? null : parseInt(state.year, 10);
+
+        const baseMatched = caseData.filter(item => {
+            if (targetYear !== null && item._year !== targetYear) return false;
+            if (state.topic !== "all" && !item._topics.includes(state.topic)) return false;
+            if (state.company !== "all" && item._company !== state.company) return false;
+            if (keywords.length > 0 && !keywords.every(kw => item._searchText.includes(kw))) return false;
+            return true;
+        });
+
+        const totalBase = baseMatched.length;
+        let winCnt = 0, partialCnt = 0, loseCnt = 0;
+        baseMatched.forEach(i => {
+            if (i._result === "保戶勝訴") winCnt++;
+            else if (i._result === "部分勝訴") partialCnt++;
+            else if (i._result === "保險公司勝") loseCnt++;
+        });
+
+        const pct = n => totalBase === 0 ? 0 : Math.round((n / totalBase) * 100);
+        const winPct = pct(winCnt), partialPct = pct(partialCnt), losePct = pct(loseCnt);
+
+        statsPanel.innerHTML = `
+            <div class="stats-numbers">
+                <span>目前條件共 <strong>${totalBase.toLocaleString()}</strong> 筆判決：</span>
+                <span class="stat-win">保戶勝訴 ${winCnt.toLocaleString()} 筆 (${winPct}%)</span>
+                <span class="stat-partial">部分勝訴 ${partialCnt.toLocaleString()} 筆 (${partialPct}%)</span>
+                <span class="stat-lose">保險公司勝 ${loseCnt.toLocaleString()} 筆 (${losePct}%)</span>
+            </div>
+            <div class="ratio-bar">
+                <div class="bar-win" style="width:${winPct}%"></div>
+                <div class="bar-partial" style="width:${partialPct}%"></div>
+                <div class="bar-lose" style="width:${losePct}%"></div>
+            </div>
+        `;
+
+        const finalList = state.result === "all"
+            ? baseMatched.slice()
+            : baseMatched.filter(item => item._result === state.result);
+
+        finalList.sort((a, b) => state.sort === "oldest"
+            ? a._sortKey - b._sortKey
+            : b._sortKey - a._sortKey
+        );
+
+        const totalFiltered = finalList.length;
+        if (totalFiltered === 0) {
+            listToolbar.innerHTML = '';
+            paginationEl.innerHTML = '';
+            container.innerHTML = '<div class="no-results">找不到符合目前組合條件的判決，可以按上方「↺ 重設全部條件」重新查詢。</div>';
+            return;
+        }
+
+        const totalPages = Math.max(1, Math.ceil(totalFiltered / state.pageSize));
+        if (state.page > totalPages) state.page = totalPages;
+        if (state.page < 1) state.page = 1;
+
+        const startIdx = (state.page - 1) * state.pageSize;
+        const endIdx = Math.min(startIdx + state.pageSize, totalFiltered);
+        const pageItems = finalList.slice(startIdx, endIdx);
+
+        listToolbar.innerHTML = `
+            <span>顯示第 <strong>${(startIdx + 1).toLocaleString()}–${endIdx.toLocaleString()}</strong> 筆（共 <strong>${totalFiltered.toLocaleString()}</strong> 筆符合）</span>
+            <span>第 <strong>${state.page}</strong> / ${totalPages} 頁</span>
+        `;
+
+        container.innerHTML = pageItems.map(item => {
+            const topicTags = item._topics.map(t => `<span class="tag topic">${escapeHtml(t)}</span>`).join('');
+            const yearBadge = item._year ? `<span class="tag year-badge">民國 ${item._year} 年</span>` : '';
+            const claimHTML = item.basicInfo?.claimInfo
+                ? `<div class="claim-pill">${escapeHtml(item.basicInfo.claimInfo)}</div>`
+                : '';
+            return `
+                <div class="card" data-id="${escapeHtml(item.id)}">
+                    <div class="tags">
+                        <span class="tag ${item._resultClass}">${escapeHtml(item._result)}</span>
+                        ${yearBadge}
+                        ${topicTags}
+                    </div>
+                    <div class="company-title">${escapeHtml(item._company || '保險公司')}｜${escapeHtml(item._topics[0] || '理賠爭議')}</div>
+                    ${claimHTML}
+                    <div class="summary">${escapeHtml(item.content?.summary || '')}</div>
+                    <div class="card-footer">
+                        <span>${escapeHtml(item.basicInfo?.court || '')} ${escapeHtml(item.basicInfo?.caseNumber || '')}</span>
+                        <span class="read-more">看完整解析 →</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        renderPagination(totalFiltered, totalPages);
+    }
+
+    function buildCopyText(item) {
+        const b = item.basicInfo || {};
+        const jList = (item.content?.judgment || []).map((j, i) => `${i + 1}. ${j}`).join('\n');
+        return [
+            `【保險判決摘要】${b.insuranceCompany || ''}（${item._result}）`,
+            `案號：${b.court || ''} ${b.caseNumber || ''}`,
+            `判決日：${b.date || ''}｜險種：${b.insuranceType || ''}`,
+            b.claimInfo ? `理賠金額：${b.claimInfo}` : '',
+            item._topics.length ? `爭議主題：${item._topics.join('、')}` : '',
+            '',
+            `【白話摘要】`,
+            item.content?.summary || '',
+            '',
+            `【法院核心見解】`,
+            jList
+        ].filter(line => line !== null && line !== undefined).join('\n').replace(/\n{3,}/g, '\n\n');
+    }
+
+    function copyTextFallback(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+    }
+
+    function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).catch(() => copyTextFallback(text));
+        } else {
+            copyTextFallback(text);
+        }
+    }
+
+    function openModal(id) {
+        const item = caseMap.get(id);
+        if (!item) return;
+
+        const timelineHTML = (item.content?.timeline || []).map(t => `
+            <div class="timeline-item">
+                <div class="timeline-date">${escapeHtml(t.date)}</div>
+                <div>${escapeHtml(t.event)}</div>
+            </div>
+        `).join('');
+
+        const customerArgs = (item.content?.arguments?.customer || []).map(a => `<li>${escapeHtml(a)}</li>`).join('');
+        const companyArgs = (item.content?.arguments?.company || []).map(a => `<li>${escapeHtml(a)}</li>`).join('');
+        const judgmentHTML = (item.content?.judgment || []).map(j => `<li>${escapeHtml(j)}</li>`).join('');
+
+        const rawHref = `raw_html/${encodeURIComponent(item.id)}.html`;
+        const rawBtnHTML = item.sourceFile
+            ? `<a class="action-btn raw-btn" href="${rawHref}" target="_blank" rel="noopener">📄 看完整判決原文</a>`
+            : '';
+
+        modalBody.innerHTML = `
+            <div class="modal-actions">
+                ${rawBtnHTML}
+                <button class="action-btn official-btn" id="officialSearchBtn" title="自動複製案號並開啟司法院檢索頁">🔎 查司法院官網</button>
+                <button class="action-btn copy-btn" id="copySummaryBtn">📋 複製白話摘要</button>
+                <button class="action-btn close-btn" id="closeModalBtn">✕ 關閉</button>
+            </div>
+            <div class="tags">
+                <span class="tag ${item._resultClass}">${escapeHtml(item._result)}</span>
+                ${item._topics.map(t => `<span class="tag topic">${escapeHtml(t)}</span>`).join('')}
+            </div>
+            <h2 style="margin: 12px 0 4px 0;">${escapeHtml(item._company)}（${escapeHtml(item.basicInfo?.caseNumber || '')}）</h2>
+            <div class="modal-meta">
+                法院：${escapeHtml(item.basicInfo?.court || '')} ｜ 險種：${escapeHtml(item.basicInfo?.insuranceType || '')} ｜ 判決日：${escapeHtml(item.basicInfo?.date || '')}
+            </div>
+            ${item.basicInfo?.claimInfo ? `<div class="amount-badge">${escapeHtml(item.basicInfo.claimInfo)}</div>` : ''}
+
+            <div class="summary-box">
+                <strong>AI 摘要：</strong><br>${escapeHtml(item.content?.summary || '')}
+            </div>
+
+            <div class="modal-section">
+                <h3>發生什麼事（時間軸）</h3>
+                ${timelineHTML || '<p style="color:#777;">無時間軸資料</p>'}
+            </div>
+
+            <div class="modal-section">
+                <h3>雙方怎麼說</h3>
+                <div class="args-grid">
+                    <div class="arg-box">
+                        <div class="arg-header customer">保戶主張</div>
+                        <ul>${customerArgs}</ul>
+                    </div>
+                    <div class="arg-box">
+                        <div class="arg-header company">保險公司抗辯（${escapeHtml(item._company)}）</div>
+                        <ul>${companyArgs}</ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-section">
+                <h3>法院怎麼判</h3>
+                <ol class="judgment-list">${judgmentHTML}</ol>
+            </div>
+
+            <div class="disclaimer">
+                免責聲明：本案整理取材自司法院法學資料檢索系統公開裁判書，僅供個案參考與專業交流，實際內容以法院判決書原文為準。
+            </div>
+        `;
+
+        document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+
+        document.getElementById('copySummaryBtn').addEventListener('click', (e) => {
+            const btn = e.currentTarget;
+            copyToClipboard(buildCopyText(item));
+            btn.textContent = "✅ 已複製摘要！";
+            setTimeout(() => { btn.textContent = "📋 複製白話摘要"; }, 1800);
+        });
+
+        document.getElementById('officialSearchBtn').addEventListener('click', (e) => {
+            const btn = e.currentTarget;
+            const query = [item.basicInfo?.court, item.basicInfo?.caseNumber].filter(Boolean).join(' ').trim();
+            if (query) copyToClipboard(query);
+            window.open('https://judgment.judicial.gov.tw/FJUD/default.aspx', '_blank', 'noopener');
+            btn.textContent = "✅ 已複製案號（貼上即查）";
+            setTimeout(() => { btn.textContent = "🔎 查司法院官網"; }, 3000);
+        });
+
+        detailModal.style.display = 'flex';
+        modalBody.scrollTop = 0;
+    }
+
+    function closeModal() { detailModal.style.display = 'none'; }
+
+    detailModal.addEventListener('click', (e) => {
+        if (e.target === detailModal) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && detailModal.style.display === 'flex') closeModal();
+    });
+
+    container.addEventListener('click', (e) => {
+        const card = e.target.closest('.card');
+        if (!card) return;
+        openModal(card.getAttribute('data-id'));
+    });
+
+    filterPanel.addEventListener('click', (e) => {
+        const btn = e.target.closest('.chip');
+        if (!btn) return;
+        if (btn.getAttribute('data-action') === 'toggle-topics') {
+            state.showAllTopics = !state.showAllTopics;
+            renderFilters();
+            return;
+        }
+        const type = btn.getAttribute('data-type');
+        const val = btn.getAttribute('data-value');
+        if (type && val !== null) {
+            state[type] = val;
+            state.page = 1;
+            renderAll();
+        }
+    });
+
+    paginationEl.addEventListener('click', (e) => {
+        if (e.target.id === 'jumpPageBtn') {
+            const inp = document.getElementById('jumpPageInput');
+            const p = parseInt(inp.value, 10);
+            if (!isNaN(p)) {
+                state.page = p;
+                renderAll();
+                statsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            return;
+        }
+        const btn = e.target.closest('.page-btn[data-page]');
+        if (!btn || btn.disabled) return;
+        state.page = parseInt(btn.getAttribute('data-page'), 10);
+        renderAll();
+        statsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    paginationEl.addEventListener('keydown', (e) => {
+        if (e.target.id === 'jumpPageInput' && e.key === 'Enter') {
+            const p = parseInt(e.target.value, 10);
+            if (!isNaN(p)) {
+                state.page = p;
+                renderAll();
+                statsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    });
+
+    let searchTimer = null;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimer);
+        const val = e.target.value;
+        searchTimer = setTimeout(() => {
+            state.search = val;
+            state.page = 1;
+            renderAll();
+        }, 150);
+    });
+
+    yearSelect.addEventListener('change', (e) => { state.year = e.target.value; state.page = 1; renderAll(); });
+    companySelect.addEventListener('change', (e) => { state.company = e.target.value; state.page = 1; renderAll(); });
+    sortSelect.addEventListener('change', (e) => { state.sort = e.target.value; state.page = 1; renderAll(); });
+    pageSizeSelect.addEventListener('change', (e) => { state.pageSize = parseInt(e.target.value, 10); state.page = 1; renderAll(); });
+
+    resetBtn.addEventListener('click', () => {
+        state.search = "";
+        state.result = "all";
+        state.topic = "all";
+        state.company = "all";
+        state.year = "all";
+        state.sort = "newest";
+        state.page = 1;
+        searchInput.value = "";
+        renderAll();
+    });
+
+    initDropdowns();
+    renderAll();
+</script>
+</body>
+</html>

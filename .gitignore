@@ -1,0 +1,9 @@
+.DS_Store
+*.bak
+*.py
+*.zip
+batch_tmp/
+batch_jobs.json
+raw_txt/
+.env
+deploy_site/
