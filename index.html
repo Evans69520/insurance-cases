@@ -451,7 +451,62 @@
             .modal-actions { justify-content: flex-start; }
             .batch-bar { justify-content: center; padding: 10px 12px; gap: 8px; }
         }
+    
+        .hero-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .advisor-launch-btn {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            padding: 13px 18px;
+            font-size: 0.95em;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 6px 16px rgba(217, 119, 6, 0.35);
+            transition: transform 0.16s, box-shadow 0.16s;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .advisor-launch-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(217, 119, 6, 0.45); }
+        .advisor-box { max-width: 880px; }
+        .advisor-input-area {
+            width: 100%;
+            min-height: 118px;
+            padding: 12px 14px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.95em;
+            line-height: 1.6;
+            resize: vertical;
+            outline: none;
+        }
+        .advisor-input-area:focus { border-color: var(--accent-blue); }
+        .advisor-tools { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .advisor-match-item {
+            border: 1px solid var(--border-light);
+            border-left: 4px solid var(--win-color);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            background: #f8fafc;
+        }
+        .advisor-match-item.lose { border-left-color: var(--lose-color); }
+        .advisor-match-item.partial { border-left-color: #f59e0b; }
+        .score-pill { background: #dbeafe; color: #1e40af; font-size: 0.78em; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+        .advisor-tip-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e3a8a;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.88em;
+            margin-top: 10px;
+            line-height: 1.55;
+        }
     </style>
+
 </head>
 <body>
 
@@ -462,10 +517,10 @@
             <h1>保險判決（2017年起）</h1>
             <p>全台法院「給付保險金」民事裁判智慧檢索與 AI 匯出平台</p>
         </div>
-        <div class="hero-stat-box">
+        <div class="hero-right"><button class="advisor-launch-btn" id="openAdvisorBtn">🤖 理賠個案比對＆爭取顧問</button><div class="hero-stat-box">
             <div class="total-number" id="totalCount">0</div>
             <div class="total-label">則收錄判決</div>
-        </div>
+        </div></div>
     </div>
 
     <div class="control-deck">
@@ -513,6 +568,37 @@
     <button class="batch-btn ghost" id="batchSelectPageBtn">全選本頁</button>
     <button class="batch-btn ghost" id="batchClearBtn">清除選取</button>
     <button class="batch-btn primary" id="batchDownloadBtn">📥 下載判決書（供 AI 分析）</button>
+</div>
+
+
+<div class="modal-overlay" id="advisorModal">
+    <div class="modal-content advisor-box">
+        <div class="modal-actions">
+            <button class="action-btn close-btn" id="closeAdvisorBtn">✕ 關閉</button>
+        </div>
+        <h2 style="margin: 6px 0 4px 0; color: var(--navy-dark);">🤖 理賠個案比對與爭取顧問</h2>
+        <p style="margin: 0 0 12px 0; color: var(--text-muted); font-size: 0.9em;">
+            輸入或上傳客戶理賠難題，系統將自動從全庫比對最有利判例，並一鍵打包判決全文與 AI 爭取指令（免設定、人人都能直接用）。
+        </p>
+
+        <textarea id="advisorIssueInput" class="advisor-input-area" placeholder="請描述客戶遇到的理賠困難，例如：&#10;「保戶投保宏泰人壽實支實付，因鼻中膈彎曲及下鼻甲肥大住院手術，使用自費醫材，保險公司以非必要住院及門診可處理為由拒賠住院醫療金，該如何爭取？」"></textarea>
+
+        <div class="advisor-tools">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <label class="select-page-btn" style="cursor:pointer;">
+                    📂 上傳案情文字檔 (.txt)
+                    <input type="file" id="advisorFileInput" accept=".txt,.md,.csv" style="display:none;">
+                </label>
+                <label style="font-size:0.88em;color:#334155;font-weight:600;display:inline-flex;align-items:center;gap:5px;cursor:pointer;">
+                    <input type="checkbox" id="preferWinCheck" checked style="accent-color:var(--accent-blue);">
+                    優先推薦「保戶勝訴 / 部分勝訴」有利判例
+                </label>
+            </div>
+            <button class="action-btn copy-btn" id="runMatchBtn" style="padding:9px 18px;font-size:0.93em;">🔍 立即比對相關判例</button>
+        </div>
+
+        <div id="advisorResultsArea" style="margin-top:18px;"></div>
+    </div>
 </div>
 
 <div class="modal-overlay" id="detailModal">
@@ -1167,6 +1253,196 @@
         searchInput.value = "";
         renderAll();
     });
+
+    
+    const advisorModal = document.getElementById('advisorModal');
+    const advisorIssueInput = document.getElementById('advisorIssueInput');
+    const advisorFileInput = document.getElementById('advisorFileInput');
+    const preferWinCheck = document.getElementById('preferWinCheck');
+    const advisorResultsArea = document.getElementById('advisorResultsArea');
+    let advisorMatchedCases = [];
+
+    const knownCompanies = [...companyCounts.keys()].filter(k => k.length >= 2);
+    const knownTopics = [...topicCounts.keys()].filter(k => k.length >= 2);
+    const knownKeywords = new Set();
+    caseData.forEach(c => (c.tags?.keywords || []).forEach(kw => { if (kw && kw.length >= 2) knownKeywords.add(kw.trim()); }));
+    const keywordList = [...knownKeywords];
+    const STOP_WORDS = new Set(["保險", "理賠", "公司", "保戶", "申請", "問題", "請問", "如果", "如何", "爭取", "可以", "遇到", "困難", "相關", "判決", "原因", "理由", "拒賠", "他們", "我們", "進行", "以及", "因為", "所以"]);
+
+    function extractTokens(text) {
+        const tokens = new Set();
+        const clean = text.replace(/[^\u4e00-\u9fffa-zA-Z0-9]/g, " ");
+        clean.split(/\s+/).forEach(part => {
+            if (!part) return;
+            if (/^[a-zA-Z0-9]{2,}$/.test(part)) { tokens.add(part.toLowerCase()); return; }
+            for (let len = 2; len <= 3; len++) {
+                for (let i = 0; i <= part.length - len; i++) {
+                    const gram = part.slice(i, i + len);
+                    if (!STOP_WORDS.has(gram)) tokens.add(gram);
+                }
+            }
+        });
+        return [...tokens];
+    }
+
+    function matchCasesForClaim(issueText, preferWin) {
+        const qLower = issueText.toLowerCase();
+        const matchedCompanies = knownCompanies.filter(c => issueText.includes(c) || (c.length >= 4 && issueText.includes(c.slice(0, 2))));
+        const matchedTopics = knownTopics.filter(t => issueText.includes(t));
+        const matchedKws = keywordList.filter(k => qLower.includes(k.toLowerCase()));
+        const grams = extractTokens(issueText);
+
+        const scored = [];
+        for (const item of caseData) {
+            let score = 0;
+            const reasons = [];
+            if (matchedCompanies.some(mc => item._company && item._company.includes(mc.slice(0, 2)))) {
+                score += 35;
+                reasons.push(`同公司（${item._company}）`);
+            }
+            matchedTopics.forEach(t => {
+                if (item._topics.includes(t)) { score += 22; reasons.push(t); }
+            });
+            matchedKws.forEach(k => {
+                if (item._searchText.includes(k.toLowerCase())) { score += 16; reasons.push(k); }
+            });
+            let gramHits = 0;
+            for (const g of grams) {
+                if (item._searchText.includes(g)) {
+                    score += g.length >= 3 ? 6 : 3;
+                    gramHits++;
+                }
+            }
+            if (score === 0 && gramHits === 0) continue;
+            if (preferWin) {
+                if (item._result === "保戶勝訴") score += 20;
+                else if (item._result === "部分勝訴") score += 12;
+            }
+            scored.push({ item, score, reasons: [...new Set(reasons)].slice(0, 4) });
+        }
+        scored.sort((a, b) => b.score - a.score || b.item._sortKey - a.item._sortKey);
+        return scored.slice(0, 6);
+    }
+
+    async function buildAdvisorPromptBundle(issueText, selectedItems) {
+        const caseBlocks = [];
+        for (let i = 0; i < selectedItems.length; i++) {
+            const it = selectedItems[i];
+            const b = it.basicInfo || {};
+            let fullTxt = "";
+            if (it.sourceFile) {
+                try {
+                    const r = await fetch(`raw_html/${encodeURIComponent(it.id)}.html`);
+                    if (r.ok) fullTxt = extractCleanTextFromHtml(await r.text()).slice(0, 8000);
+                } catch (e) {}
+            }
+            const jList = (it.content?.judgment || []).join("；");
+            caseBlocks.push(
+                `【參考判例 ${i + 1}】${b.insuranceCompany || ""}｜${b.court || ""} ${b.caseNumber || ""}（${it._result}）\n` +
+                `險種與金額：${b.insuranceType || ""}｜${b.claimInfo || ""}\n` +
+                `白話摘要：${it.content?.summary || ""}\n` +
+                `法院核心理由：${jList}\n` +
+                (fullTxt ? `判決書全文：\n${fullTxt}` : "")
+            );
+        }
+
+        return (
+            `你現在是一位擁有 20 年實務經驗的台灣保險理賠法務顧問與申訴談判專家。\n` +
+            `我目前正在協助保戶處理一項理賠爭議，請根據下方的【客戶理賠狀況】以及系統從台灣法院判決庫比對出的【相關歷史判決】，為我擬定一套專業、具體且合法合規的「理賠爭取策略與溝通建議」。\n\n` +
+            `====================\n【客戶理賠狀況與困難】\n${issueText.trim()}\n====================\n\n` +
+            `【系統比對之相關法院判決】\n${caseBlocks.join("\n\n------------------------------------\n\n")}\n\n` +
+            `====================\n請依序為我輸出以下 4 個部分：\n` +
+            `1. 【爭議焦點與突破口分析】：指出保險公司抗辯的薄弱處，以及對保戶最有利的法理或契約解釋方向。\n` +
+            `2. 【可引用的勝訴判決見解】：整理上述參考判例中，法院支持保戶的具體理由與字號，方便在申訴書或溝通時引用。\n` +
+            `3. 【建議補充舉證清單】：具體列出還需要請醫師開立什麼診斷內容、病歷記載或收據明細，才能強化理賠依據。\n` +
+            `4. 【給理賠人員的專業溝通話術】：提供一段不卑不亢、有理有據的電話溝通與書面申訴說帖範本。`
+        );
+    }
+
+
+    function renderAdvisorResults() {
+        const issueText = advisorIssueInput.value.trim();
+        if (!issueText) {
+            advisorResultsArea.innerHTML = `<div style="color:#dc2626;font-weight:600;">請先輸入或上傳客戶的理賠問題描述喔！</div>`;
+            return;
+        }
+        advisorMatchedCases = matchCasesForClaim(issueText, preferWinCheck.checked);
+        if (advisorMatchedCases.length === 0) {
+            advisorResultsArea.innerHTML = `<div style="color:#64748b;padding:16px;background:#f8fafc;border-radius:10px;">暫時沒有比對到高度相符的判例，建議補充「險種（如實支實付、意外險）」、「疾病或手術名稱」或「保險公司名稱」再試一次！</div>`;
+            return;
+        }
+
+        const listHtml = advisorMatchedCases.map((m, idx) => {
+            const it = m.item;
+            const b = it.basicInfo || {};
+            const cls = it._result === "保戶勝訴" ? "" : (it._result === "部分勝訴" ? "partial" : "lose");
+            const tagsHtml = m.reasons.map(r => `<span class="score-pill">${escapeHtml(r)}</span>`).join(" ");
+            return `
+                <div class="advisor-match-item ${cls}">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+                        <div>
+                            <label style="font-weight:800;color:var(--navy-dark);cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                                <input type="checkbox" class="advisor-case-chk" data-idx="${idx}" ${idx < 3 ? "checked" : ""} style="accent-color:var(--accent-blue);width:16px;height:16px;">
+                                <span class="tag ${it._resultClass}">${escapeHtml(it._result)}</span>
+                                <span>${escapeHtml(b.insuranceCompany || "")}｜${escapeHtml(b.court || "")} ${escapeHtml(b.caseNumber || "")}</span>
+                            </label>
+                        </div>
+                        <div style="display:flex;gap:5px;flex-wrap:wrap;">${tagsHtml}</div>
+                    </div>
+                    <div style="font-size:0.88em;color:#334155;margin-top:6px;line-height:1.55;">${escapeHtml(it.content?.summary || "")}</div>
+                    <div style="margin-top:6px;font-size:0.82em;">
+                        <a href="raw_html/${encodeURIComponent(it.id)}.html" target="_blank" rel="noopener" style="color:var(--accent-blue);font-weight:700;text-decoration:none;">📄 檢視判決原文 ↗</a>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        advisorResultsArea.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                <strong style="color:var(--navy-dark);">🎯 為您比對出 ${advisorMatchedCases.length} 篇最相關判例（預設勾選前 3 篇，可自由增減）：</strong>
+            </div>
+            ${listHtml}
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-light);">
+                <button class="action-btn raw-btn" id="copyAdvisorPromptBtn" style="padding:11px 18px;font-size:0.95em;">📋 一鍵複製「案情＋精選判決書＋AI 爭取指令」</button>
+                <div class="advisor-tip-box">
+                    💡 <strong>使用方式：</strong>點擊上方綠色按鈕後，系統已自動把「客戶狀況 ＋ 勾選的判決書全文 ＋ 爭取建議提問指令」複製到剪貼簿；直接打開您的 <strong>Gemini</strong> 或 <strong>ChatGPT</strong> 對話框按貼上送出，就能立刻得到具體爭取策略與溝通話術！
+                </div>
+            </div>
+        `;
+
+        document.getElementById('copyAdvisorPromptBtn').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const checkedIdxs = [...advisorResultsArea.querySelectorAll('.advisor-case-chk:checked')].map(el => parseInt(el.dataset.idx, 10));
+            const picked = checkedIdxs.map(i => advisorMatchedCases[i]?.item).filter(Boolean);
+            if (picked.length === 0) { alert("請至少勾選 1 篇參考判例！"); return; }
+            btn.disabled = true;
+            btn.textContent = "⏳ 正在打包判決書原文與指令...";
+            try {
+                const bundle = await buildAdvisorPromptBundle(issueText, picked);
+                copyToClipboard(bundle);
+                btn.textContent = "✅ 已複製完整攻防指令包！請貼到 Gemini / ChatGPT";
+                setTimeout(() => { btn.textContent = "📋 一鍵複製「案情＋精選判決書＋AI 爭取指令」"; }, 3500);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    }
+
+    document.getElementById('openAdvisorBtn').addEventListener('click', () => { advisorModal.style.display = "flex"; });
+    document.getElementById('closeAdvisorBtn').addEventListener('click', () => { advisorModal.style.display = "none"; });
+    advisorModal.addEventListener('click', (e) => { if (e.target === advisorModal) advisorModal.style.display = "none"; });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && advisorModal.style.display === 'flex') advisorModal.style.display = 'none'; });
+    advisorFileInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            const content = String(reader.result || "").trim();
+            advisorIssueInput.value = advisorIssueInput.value ? `${advisorIssueInput.value}\n\n${content}` : content;
+        };
+        reader.readAsText(file, "utf-8");
+    });
+    document.getElementById('runMatchBtn').addEventListener('click', renderAdvisorResults);
 
     initDropdowns();
     renderAll();
