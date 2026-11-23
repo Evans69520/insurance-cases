@@ -619,7 +619,7 @@
             輸入或上傳客戶理賠難題，系統將自動從全庫比對最有利判例，並一鍵打包判決全文與 AI 爭取指令（免設定、人人都能直接用）。
         </p>
 
-        <textarea id="advisorIssueInput" class="advisor-input-area" placeholder="請描述客戶遇到的理賠困難，例如：&#10;「保戶投保宏泰人壽實支實付，因鼻中膈彎曲及下鼻甲肥大住院手術，使用自費醫材，保險公司以非必要住院及門診可處理為由拒賠住院醫療金，該如何爭取？」"></textarea>
+        <textarea id="advisorIssueInput" class="advisor-input-area" placeholder="請在此輸入補充說明或核心爭點（例如：「理賠說我 clo test 不能賠，該如何爭取？」）。&#10;下方上傳的圖片或 PDF 會在背景自動辨識並一併納入比對，不會佔用此輸入框。"></textarea>
 
         <div class="advisor-tools">
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -641,6 +641,7 @@
 
         <div id="advisorImagePreviews" class="img-preview-strip"></div>
         <div id="ocrStatusBanner" class="ocr-status" style="display:none;"></div>
+        <div id="extractedPreviewDrawer" style="margin-top:8px;"></div>
         <div id="advisorResultsArea" style="margin-top:18px;"></div>
     </div>
 </div>
@@ -1369,7 +1370,43 @@
         return scored.slice(0, 6);
     }
 
-    async function buildAdvisorPromptBundle(issueText, selectedItems) {
+    let extractedAttachments = [];
+
+    function getCombinedCaseContext() {
+        const userNote = advisorIssueInput.value.trim();
+        const attText = extractedAttachments
+            .map(a => `【附件（${a.type === 'image' ? '圖片辨識' : '文件內容'}）：${a.name}】\n${a.text}`)
+            .join('\n\n');
+        const fullContext = [userNote, attText].filter(Boolean).join('\n\n');
+        return { userNote, attText, fullContext };
+    }
+
+    function refreshAttachmentDrawer() {
+        const drawer = document.getElementById('extractedPreviewDrawer');
+        if (!drawer) return;
+        if (extractedAttachments.length === 0) {
+            drawer.innerHTML = '';
+            return;
+        }
+        const itemsHtml = extractedAttachments.map(a => `
+            <div style="margin-top:8px;padding:8px 10px;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;">
+                <div style="font-weight:700;color:var(--navy-dark);font-size:0.84em;margin-bottom:4px;">
+                    ${a.type === 'image' ? '🖼️' : '📄'} ${escapeHtml(a.name)}
+                </div>
+                <div style="white-space:pre-wrap;font-size:0.83em;color:#475569;max-height:130px;overflow-y:auto;line-height:1.5;">${escapeHtml(a.text)}</div>
+            </div>
+        `).join('');
+        drawer.innerHTML = `
+            <details style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;">
+                <summary style="cursor:pointer;font-size:0.85em;font-weight:700;color:#334155;">
+                    👁️ 檢視背景已讀取的附件文字（共 ${extractedAttachments.length} 份，比對時會自動一併納入）
+                </summary>
+                ${itemsHtml}
+            </details>
+        `;
+    }
+
+    async function buildAdvisorPromptBundle(userNote, attText, selectedItems) {
         const caseBlocks = [];
         for (let i = 0; i < selectedItems.length; i++) {
             const it = selectedItems[i];
@@ -1391,10 +1428,14 @@
             );
         }
 
+        const issueSections = [];
+        if (userNote) issueSections.push(`【業務員 / 保戶補充說明】\n${userNote}`);
+        if (attText) issueSections.push(`【上傳之診斷書 / 拒賠函 / 附件內容】\n${attText}`);
+
         return (
             `你現在是一位擁有 20 年實務經驗的台灣保險理賠法務顧問與申訴談判專家。\n` +
-            `我目前正在協助保戶處理一項理賠爭議，請根據下方的【客戶理賠狀況】以及系統從台灣法院判決庫比對出的【相關歷史判決】，為我擬定一套專業、具體且合法合規的「理賠爭取策略與溝通建議」。\n\n` +
-            `====================\n【客戶理賠狀況與困難】\n${issueText.trim()}\n====================\n\n` +
+            `我目前正在協助保戶處理一項理賠爭議，請根據下方的【客戶理賠狀況與附件資料】以及系統從台灣法院判決庫比對出的【相關歷史判決】，為我擬定一套專業、具體且合法合規的「理賠爭取策略與溝通建議」。\n\n` +
+            `====================\n${issueSections.join("\n\n")}\n====================\n\n` +
             `【系統比對之相關法院判決】\n${caseBlocks.join("\n\n------------------------------------\n\n")}\n\n` +
             `====================\n請依序為我輸出以下 4 個部分：\n` +
             `1. 【爭議焦點與突破口分析】：指出保險公司抗辯的薄弱處，以及對保戶最有利的法理或契約解釋方向。\n` +
@@ -1404,16 +1445,15 @@
         );
     }
 
-
     function renderAdvisorResults() {
-        const issueText = advisorIssueInput.value.trim();
-        if (!issueText) {
-            advisorResultsArea.innerHTML = `<div style="color:#dc2626;font-weight:600;">請先輸入或上傳客戶的理賠問題描述喔！</div>`;
+        const { userNote, attText, fullContext } = getCombinedCaseContext();
+        if (!fullContext) {
+            advisorResultsArea.innerHTML = `<div style="color:#dc2626;font-weight:600;">請先在上方輸入補充說明，或上傳診斷書 / 拒賠函圖片與文件喔！</div>`;
             return;
         }
-        advisorMatchedCases = matchCasesForClaim(issueText, preferWinCheck.checked);
+        advisorMatchedCases = matchCasesForClaim(fullContext, preferWinCheck.checked);
         if (advisorMatchedCases.length === 0) {
-            advisorResultsArea.innerHTML = `<div style="color:#64748b;padding:16px;background:#f8fafc;border-radius:10px;">暫時沒有比對到高度相符的判例，建議補充「險種（如實支實付、意外險）」、「疾病或手術名稱」或「保險公司名稱」再試一次！</div>`;
+            advisorResultsArea.innerHTML = `<div style="color:#64748b;padding:16px;background:#f8fafc;border-radius:10px;">暫時沒有比對到高度相符的判例，建議在上方補充「險種（如實支實付、意外險）」、「疾病或手術名稱」或「保險公司名稱」再試一次！</div>`;
             return;
         }
 
@@ -1450,7 +1490,7 @@
             <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-light);">
                 <button class="action-btn raw-btn" id="copyAdvisorPromptBtn" style="padding:11px 18px;font-size:0.95em;">📋 一鍵複製「案情＋精選判決書＋AI 爭取指令」</button>
                 <div class="advisor-tip-box">
-                    💡 <strong>使用方式：</strong>點擊上方綠色按鈕後，系統已自動把「客戶狀況 ＋ 勾選的判決書全文 ＋ 爭取建議提問指令」複製到剪貼簿；直接打開您的 <strong>Gemini</strong> 或 <strong>ChatGPT</strong> 對話框按貼上送出，就能立刻得到具體爭取策略與溝通話術！
+                    💡 <strong>使用方式：</strong>點擊上方綠色按鈕後，系統會自動把「您的補充說明 ＋ 背景讀取的圖片／文件文字 ＋ 勾選的判決書全文 ＋ 爭取指令」複製到剪貼簿；直接貼進 <strong>Gemini</strong> 或 <strong>ChatGPT</strong> 就能立刻獲得完整溝通策略！
                 </div>
             </div>
         `;
@@ -1463,7 +1503,8 @@
             btn.disabled = true;
             btn.textContent = "⏳ 正在打包判決書原文與指令...";
             try {
-                const bundle = await buildAdvisorPromptBundle(issueText, picked);
+                const latest = getCombinedCaseContext();
+                const bundle = await buildAdvisorPromptBundle(latest.userNote, latest.attText, picked);
                 copyToClipboard(bundle);
                 btn.textContent = "✅ 已複製完整攻防指令包！請貼到 Gemini / ChatGPT";
                 setTimeout(() => { btn.textContent = "📋 一鍵複製「案情＋精選判決書＋AI 爭取指令」"; }, 3500);
@@ -1477,6 +1518,7 @@
     document.getElementById('closeAdvisorBtn').addEventListener('click', () => { advisorModal.style.display = "none"; });
     advisorModal.addEventListener('click', (e) => { if (e.target === advisorModal) advisorModal.style.display = "none"; });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && advisorModal.style.display === 'flex') advisorModal.style.display = 'none'; });
+
     const advisorImgInput = document.getElementById('advisorImgInput');
     const advisorDocInput = document.getElementById('advisorDocInput');
     const advisorImagePreviews = document.getElementById('advisorImagePreviews');
@@ -1495,22 +1537,17 @@
             .trim();
     }
 
-    function appendToIssueBox(blockText) {
-        if (!blockText) return;
-        advisorIssueInput.value = advisorIssueInput.value.trim()
-            ? `${advisorIssueInput.value.trim()}\n\n${blockText}`
-            : blockText;
-    }
-
-    function appendImageThumb(file) {
+    function appendImageThumb(file, attId) {
         const url = URL.createObjectURL(file);
         const card = document.createElement('div');
         card.className = 'img-thumb-card';
         card.title = file.name || '上傳的圖片';
-        card.innerHTML = `<img src="${url}" alt="預覽"><button type="button" class="img-thumb-del" title="移除縮圖">✕</button>`;
+        card.innerHTML = `<img src="${url}" alt="預覽"><button type="button" class="img-thumb-del" title="移除此圖片">✕</button>`;
         card.querySelector('.img-thumb-del').addEventListener('click', () => {
             URL.revokeObjectURL(url);
             card.remove();
+            extractedAttachments = extractedAttachments.filter(a => a.id !== attId);
+            refreshAttachmentDrawer();
         });
         advisorImagePreviews.appendChild(card);
     }
@@ -1519,9 +1556,7 @@
         const images = [...(fileList || [])].filter(f => f.type && f.type.startsWith('image/'));
         if (images.length === 0) return;
 
-        images.forEach(appendImageThumb);
         ocrStatusBanner.style.display = 'block';
-
         if (typeof Tesseract === 'undefined') {
             ocrStatusBanner.textContent = '⚠️ 圖片辨識引擎尚未載入完成，請確認網路連線後重試。';
             return;
@@ -1531,21 +1566,28 @@
             for (let i = 0; i < images.length; i++) {
                 const img = images[i];
                 const label = img.name || `截圖_${i + 1}`;
-                ocrStatusBanner.textContent = `⏳ 正在辨識圖片文字 (${i + 1}/${images.length})：${label}（首次載入繁中字庫約需 5–10 秒）...`;
+                const attId = `img_${Date.now()}_${i}`;
+                appendImageThumb(img, attId);
+
+                ocrStatusBanner.textContent = `⏳ 正在背景辨識圖片 (${i + 1}/${images.length})：${label}（不會佔用上方補充框）...`;
                 const res = await Tesseract.recognize(img, 'chi_tra+eng', {
                     logger: m => {
                         if (m.status === 'recognizing text') {
                             const pct = Math.round((m.progress || 0) * 100);
-                            ocrStatusBanner.textContent = `⏳ 正在辨識圖片文字 (${i + 1}/${images.length})：${pct}%`;
+                            ocrStatusBanner.textContent = `⏳ 正在背景辨識圖片 (${i + 1}/${images.length})：${pct}%`;
                         }
                     }
                 });
                 const cleaned = cleanChineseOcrText(res?.data?.text || '');
-                appendToIssueBox(cleaned
-                    ? `【圖片辨識內容：${label}】\n${cleaned}`
-                    : `【圖片：${label}】（未偵測到清晰文字，可手動補充重點）`);
+                extractedAttachments.push({
+                    id: attId,
+                    type: 'image',
+                    name: label,
+                    text: cleaned || '（圖片未偵測到清晰文字，建議在上方輸入框補充說明）'
+                });
+                refreshAttachmentDrawer();
             }
-            ocrStatusBanner.textContent = `✅ 已完成 ${images.length} 張圖片文字辨識並帶入上方欄位（絕無亂碼，可自由微調後按「立即比對相關判例」）。`;
+            ocrStatusBanner.textContent = `✅ 已在背景讀取 ${images.length} 張圖片內容（上方輸入框已保留給您撰寫補充說明，比對與複製給 AI 時會自動一併納入）。`;
         } catch (err) {
             ocrStatusBanner.textContent = `⚠️ 圖片辨識發生異常：${err.message || err}`;
         }
@@ -1557,7 +1599,7 @@
         const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
         const chunks = [];
         for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
-            ocrStatusBanner.textContent = `⏳ 正在讀取 PDF 第 ${pageNo}/${pdf.numPages} 頁：${file.name}...`;
+            ocrStatusBanner.textContent = `⏳ 正在背景讀取 PDF 第 ${pageNo}/${pdf.numPages} 頁：${file.name}...`;
             const page = await pdf.getPage(pageNo);
             const tc = await page.getTextContent();
             const rawStr = tc.items.map(it => it.str).join(' ');
@@ -1565,7 +1607,7 @@
             if (cleaned.length >= 15) {
                 chunks.push(cleaned);
             } else if (typeof Tesseract !== 'undefined') {
-                ocrStatusBanner.textContent = `⏳ 第 ${pageNo}/${pdf.numPages} 頁為掃描影像，啟動繁中 OCR 辨識...`;
+                ocrStatusBanner.textContent = `⏳ 第 ${pageNo}/${pdf.numPages} 頁為掃描影像，啟動背景 OCR 辨識...`;
                 const viewport = page.getViewport({ scale: 1.8 });
                 const canvas = document.createElement('canvas');
                 canvas.width = viewport.width;
@@ -1585,19 +1627,19 @@
         ocrStatusBanner.style.display = 'block';
 
         try {
-            for (const f of docs) {
+            for (let i = 0; i < docs.length; i++) {
+                const f = docs[i];
                 const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
-                if (isPdf) {
-                    const pdfText = await extractPdfText(f);
-                    appendToIssueBox(pdfText
-                        ? `【PDF 內容：${f.name}】\n${pdfText}`
-                        : `【PDF：${f.name}】（未偵測到可讀取文字）`);
-                } else {
-                    const txt = (await f.text()).trim();
-                    if (txt) appendToIssueBox(`【文字檔：${f.name}】\n${txt}`);
-                }
+                const content = isPdf ? await extractPdfText(f) : (await f.text()).trim();
+                extractedAttachments.push({
+                    id: `doc_${Date.now()}_${i}`,
+                    type: 'doc',
+                    name: f.name,
+                    text: content || '（未偵測到可讀取文字）'
+                });
+                refreshAttachmentDrawer();
             }
-            ocrStatusBanner.textContent = `✅ 已完成 ${docs.length} 份文件解析並帶入上方欄位！`;
+            ocrStatusBanner.textContent = `✅ 已在背景讀取 ${docs.length} 份文件內容（上方輸入框已保留給您撰寫補充說明）。`;
         } catch (err) {
             ocrStatusBanner.textContent = `⚠️ 文件解析異常：${err.message || err}`;
         }
@@ -1623,7 +1665,10 @@
             await processImageFiles(imgs);
         }
     });
+
     document.getElementById('runMatchBtn').addEventListener('click', renderAdvisorResults);
+
+    
 
     initDropdowns();
     renderAll();
