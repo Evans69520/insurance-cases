@@ -542,7 +542,22 @@
             font-size: 0.88em;
             font-weight: 600;
         }
+    
+        .adv-lock-box { max-width: 410px; text-align: center; padding-top: 24px; }
+        .adv-lock-icon {
+            width: 52px; height: 52px; margin: 0 auto 12px;
+            border-radius: 50%; background: #eff6ff; color: var(--navy-dark);
+            display: flex; align-items: center; justify-content: center; font-size: 1.55em;
+        }
+        .adv-lock-input {
+            width: 100%; padding: 12px 14px; margin: 14px 0 8px;
+            border: 1.5px solid #cbd5e1; border-radius: 10px;
+            font-size: 1em; text-align: center; letter-spacing: 0.08em; outline: none;
+        }
+        .adv-lock-input:focus { border-color: var(--accent-blue); }
+        .adv-lock-err { color: #dc2626; font-size: 0.86em; font-weight: 600; min-height: 20px; margin-bottom: 10px; }
     </style>
+
 
 
 
@@ -647,6 +662,23 @@
     </div>
 </div>
 
+
+
+<div class="modal-overlay" id="advisorLockModal">
+    <div class="modal-content adv-lock-box">
+        <div class="adv-lock-icon">🔒</div>
+        <h3 style="margin: 0 0 6px 0; color: var(--navy-dark); font-size: 1.22em;">理賠個案比對＆溝通建議</h3>
+        <p style="margin: 0; color: var(--text-muted); font-size: 0.9em; line-height: 1.55;">
+            此功能為專屬工具，請輸入通關密碼解鎖（輸入一次後本機將自動記憶）。
+        </p>
+        <input type="password" id="advLockInput" class="adv-lock-input" placeholder="請輸入通關密碼" autocomplete="current-password">
+        <div class="adv-lock-err" id="advLockErr"></div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button class="action-btn official-btn" id="advLockCancel" style="padding: 9px 18px;">取消</button>
+            <button class="action-btn copy-btn" id="advLockSubmit" style="padding: 9px 22px;">🔓 進入使用</button>
+        </div>
+    </div>
+</div>
 
 <div class="modal-overlay" id="detailModal">
     <div class="modal-content" id="modalBody"></div>
@@ -1516,7 +1548,7 @@
         });
     }
 
-    document.getElementById('openAdvisorBtn').addEventListener('click', () => { advisorModal.style.display = "flex"; });
+    document.getElementById('openAdvisorBtn').addEventListener('click', openAdvisorWithLock);
     document.getElementById('closeAdvisorBtn').addEventListener('click', () => { advisorModal.style.display = "none"; });
     advisorModal.addEventListener('click', (e) => { if (e.target === advisorModal) advisorModal.style.display = "none"; });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && advisorModal.style.display === 'flex') advisorModal.style.display = 'none'; });
@@ -1673,6 +1705,53 @@
     
 
     
+    
+    const ADV_LOCK_HASH = "5d32f72faf4190ee8434421a9c964d01a5a921e0bc85f8f0268af6073ae05dc2";
+    const ADV_LOCK_KEY = "evans_advisor_unlock_token";
+    const advisorLockModal = document.getElementById('advisorLockModal');
+    const advLockInput = document.getElementById('advLockInput');
+    const advLockErr = document.getElementById('advLockErr');
+
+    async function sha256Adv(text) {
+        if (window.crypto && window.crypto.subtle) {
+            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+            return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        return text;
+    }
+
+    function openAdvisorWithLock() {
+        if (localStorage.getItem(ADV_LOCK_KEY) === ADV_LOCK_HASH) {
+            advisorModal.style.display = "flex";
+            return;
+        }
+        advLockInput.value = "";
+        advLockErr.textContent = "";
+        advisorLockModal.style.display = "flex";
+        setTimeout(() => advLockInput.focus(), 60);
+    }
+
+    async function verifyAdvisorLock() {
+        const raw = advLockInput.value.trim();
+        if (!raw) {
+            advLockErr.textContent = "請先輸入通關密碼喔！";
+            return;
+        }
+        if (await sha256Adv(raw) === ADV_LOCK_HASH) {
+            localStorage.setItem(ADV_LOCK_KEY, ADV_LOCK_HASH);
+            advisorLockModal.style.display = "none";
+            advisorModal.style.display = "flex";
+        } else {
+            advLockErr.textContent = "❌ 密碼不正確，請重新確認。";
+            advLockInput.select();
+        }
+    }
+
+    document.getElementById('advLockSubmit').addEventListener('click', verifyAdvisorLock);
+    document.getElementById('advLockCancel').addEventListener('click', () => { advisorLockModal.style.display = "none"; });
+    advisorLockModal.addEventListener('click', (e) => { if (e.target === advisorLockModal) advisorLockModal.style.display = "none"; });
+    advLockInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyAdvisorLock(); });
+
     initDropdowns();
     renderAll();
 </script>
