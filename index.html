@@ -542,7 +542,34 @@
             font-size: 0.88em;
             font-weight: 600;
         }
+    
+        .vip-status-pill {
+            background: rgba(255, 255, 255, 0.14);
+            color: #fde68a;
+            border: 1px solid rgba(253, 230, 138, 0.35);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 0.84em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .vip-status-pill:hover { background: rgba(255, 255, 255, 0.22); }
+        .vip-box { max-width: 430px; text-align: center; padding-top: 24px; }
+        .vip-lock-icon {
+            width: 54px; height: 54px; margin: 0 auto 12px;
+            border-radius: 50%; background: #eff6ff; color: var(--navy-dark);
+            display: flex; align-items: center; justify-content: center; font-size: 1.6em;
+        }
+        .vip-pw-input {
+            width: 100%; padding: 12px 14px; margin: 14px 0 8px;
+            border: 1.5px solid #cbd5e1; border-radius: 10px;
+            font-size: 1em; text-align: center; letter-spacing: 0.08em; outline: none;
+        }
+        .vip-pw-input:focus { border-color: var(--accent-blue); }
+        .vip-err-msg { color: #dc2626; font-size: 0.86em; font-weight: 600; min-height: 20px; margin-bottom: 10px; }
     </style>
+
 
 
 </head>
@@ -555,7 +582,7 @@
             <h1>EVANS的保險判決小書庫（2017年起）</h1>
             <p>全台法院「給付保險金」民事裁判智慧檢索與 AI 匯出平台</p>
         </div>
-        <div class="hero-right"><button class="advisor-launch-btn" id="openAdvisorBtn">🤖 理賠個案比對＆溝通建議</button><div class="hero-stat-box">
+        <div class="hero-right"><button class="vip-status-pill" id="vipStatusPill">🔒 VIP 專區</button><button class="advisor-launch-btn" id="openAdvisorBtn">🔒 理賠個案比對＆溝通建議</button><div class="hero-stat-box">
             <div class="total-number" id="totalCount">0</div>
             <div class="total-label">則收錄判決</div>
         </div></div>
@@ -643,6 +670,23 @@
         <div id="ocrStatusBanner" class="ocr-status" style="display:none;"></div>
         <div id="extractedPreviewDrawer" style="margin-top:8px;"></div>
         <div id="advisorResultsArea" style="margin-top:18px;"></div>
+    </div>
+</div>
+
+
+<div class="modal-overlay" id="vipModal">
+    <div class="modal-content vip-box">
+        <div class="vip-lock-icon">🔐</div>
+        <h3 style="margin: 0 0 6px 0; color: var(--navy-dark); font-size: 1.25em;">VIP 專屬進階功能</h3>
+        <p style="margin: 0; color: var(--text-muted); font-size: 0.9em; line-height: 1.55;">
+            「理賠個案比對＆溝通建議」與「多選打包下載判決書」為專屬功能，請輸入通關密碼解鎖（輸入一次後本機將自動記憶）。
+        </p>
+        <input type="password" id="vipPwInput" class="vip-pw-input" placeholder="請輸入 VIP 通關密碼" autocomplete="current-password">
+        <div class="vip-err-msg" id="vipErrMsg"></div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button class="action-btn official-btn" id="vipCancelBtn" style="padding: 9px 18px;">稍後再說</button>
+            <button class="action-btn copy-btn" id="vipUnlockBtn" style="padding: 9px 22px;">🔓 立即解鎖</button>
+        </div>
     </div>
 </div>
 
@@ -1514,7 +1558,7 @@
         });
     }
 
-    document.getElementById('openAdvisorBtn').addEventListener('click', () => { advisorModal.style.display = "flex"; });
+    document.getElementById('openAdvisorBtn').addEventListener('click', () => { requireVip(() => { advisorModal.style.display = "flex"; }); });
     document.getElementById('closeAdvisorBtn').addEventListener('click', () => { advisorModal.style.display = "none"; });
     advisorModal.addEventListener('click', (e) => { if (e.target === advisorModal) advisorModal.style.display = "none"; });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && advisorModal.style.display === 'flex') advisorModal.style.display = 'none'; });
@@ -1669,6 +1713,116 @@
     document.getElementById('runMatchBtn').addEventListener('click', renderAdvisorResults);
 
     
+
+    
+    const VIP_HASH = "1a0dfab6d624fe4e702121ab0efcbad5e135665e80bc802f89e5053d3ce5b365";
+    const VIP_STORAGE_KEY = "evans_insurance_vip_token";
+    const vipModal = document.getElementById('vipModal');
+    const vipPwInput = document.getElementById('vipPwInput');
+    const vipErrMsg = document.getElementById('vipErrMsg');
+    const vipStatusPill = document.getElementById('vipStatusPill');
+    let pendingVipAction = null;
+
+    function isVipUnlocked() {
+        return localStorage.getItem(VIP_STORAGE_KEY) === VIP_HASH;
+    }
+
+    function refreshVipUI() {
+        if (!vipStatusPill) return;
+        const unlocked = isVipUnlocked();
+        vipStatusPill.textContent = unlocked ? "🔓 VIP 已解鎖" : "🔒 VIP 專區";
+        vipStatusPill.title = unlocked ? "點擊可重新上鎖（測試訪客視角）" : "點擊輸入 VIP 通關密碼";
+    }
+
+    async function sha256Hex(text) {
+        if (window.crypto && window.crypto.subtle) {
+            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+            return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        return text;
+    }
+
+    function requireVip(actionFn) {
+        if (isVipUnlocked()) {
+            if (typeof actionFn === 'function') actionFn();
+            return;
+        }
+        pendingVipAction = actionFn || null;
+        vipPwInput.value = "";
+        vipErrMsg.textContent = "";
+        vipModal.style.display = "flex";
+        setTimeout(() => vipPwInput.focus(), 60);
+    }
+
+    async function handleVipUnlock() {
+        const raw = vipPwInput.value.trim();
+        if (!raw) {
+            vipErrMsg.textContent = "請先輸入通關密碼喔！";
+            return;
+        }
+        const hashed = await sha256Hex(raw);
+        if (hashed === VIP_HASH) {
+            localStorage.setItem(VIP_STORAGE_KEY, VIP_HASH);
+            vipModal.style.display = "none";
+            refreshVipUI();
+            const act = pendingVipAction;
+            pendingVipAction = null;
+            if (typeof act === 'function') act();
+        } else {
+            vipErrMsg.textContent = "❌ 密碼不正確，請重新確認後再試。";
+            vipPwInput.select();
+        }
+    }
+
+    document.getElementById('vipUnlockBtn').addEventListener('click', handleVipUnlock);
+    document.getElementById('vipCancelBtn').addEventListener('click', () => {
+        pendingVipAction = null;
+        vipModal.style.display = "none";
+    });
+    vipModal.addEventListener('click', (e) => {
+        if (e.target === vipModal) {
+            pendingVipAction = null;
+            vipModal.style.display = "none";
+        }
+    });
+    vipPwInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleVipUnlock();
+    });
+    if (vipStatusPill) {
+        vipStatusPill.addEventListener('click', () => {
+            if (isVipUnlocked()) {
+                if (confirm("目前為「VIP 已解鎖」狀態，要重新上鎖以測試一般訪客畫面嗎？")) {
+                    localStorage.removeItem(VIP_STORAGE_KEY);
+                    state.selectedIds.clear();
+                    renderAll();
+                    refreshVipUI();
+                }
+            } else {
+                requireVip(null);
+            }
+        });
+    }
+
+    const _origToggleSelectId = toggleSelectId;
+    toggleSelectId = function(id, forceVal) {
+        if (!isVipUnlocked()) {
+            renderAll();
+            requireVip(() => _origToggleSelectId(id, forceVal));
+            return;
+        }
+        _origToggleSelectId(id, forceVal);
+    };
+
+    const _origToggleSelectCurrentPage = toggleSelectCurrentPage;
+    toggleSelectCurrentPage = function() {
+        if (!isVipUnlocked()) {
+            requireVip(() => _origToggleSelectCurrentPage());
+            return;
+        }
+        _origToggleSelectCurrentPage();
+    };
+
+    refreshVipUI();
 
     initDropdowns();
     renderAll();
